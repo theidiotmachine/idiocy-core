@@ -3,7 +3,7 @@
 ## Introduction
 Core and gui of the idiocy synth. Doesn't, you know, work, so don't use it
 
-##Licence information
+## Licence information
 Please read the licence information in LICENCE.md.
 
 ## Building
