@@ -1,9 +1,6 @@
-package idiocy.ui.renderer
+package idiocy.ui.music.event
 
-import idiocy.music.key.Key
-import idiocy.ui.clipboard.ClipboardEvent
-
-object DisplayEvent{
+object MusicEvent{
   val PipsToABeat = 144 //there are 144 pips to a quarter note
 
   val Whole: Int = PipsToABeat * 4
@@ -15,9 +12,8 @@ object DisplayEvent{
   val Eighth: Int = PipsToABeat / 2
   val DottedSixteenth: Int = PipsToABeat / 4 + PipsToABeat / 8
   val Sixteenth: Int = PipsToABeat / 4
-
 }
 
-trait DisplayEvent {
+trait MusicEvent {
   val lengthPips: Long
 }

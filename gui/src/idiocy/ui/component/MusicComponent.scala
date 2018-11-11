@@ -23,9 +23,11 @@ class MusicComponent(document: Document) extends JComponent with MouseListener{
     graphics.setColor(GlobalUISettings.palette.bgColor)
     graphics.fillRect(0, 0, getWidth, getHeight)
 
-    document.displayPiece.render(graphics,
-      new Dimension(getWidth, getHeight), document.cursor, document.selection, document.displayParams)
+    document.render(graphics,
+      new Dimension(getWidth, getHeight), document.selection, document.displayParams)
   }
 
   override def isFocusable: Boolean = true
+
+
 }

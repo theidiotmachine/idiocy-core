@@ -19,19 +19,27 @@ object MeasureSelection {
   implicit def rw: RW[MeasureSelection] = macroRW
 }
 
-case class MeasureSelection(staffT: Int = 0, measureL: Int = 0,
-                            staffB: Int = 0, measureR: Int = 0,
+case class MeasureSelection(sectionIds: Array[Int] = Array(),
+                            staffT: Int = 0, measureIdL: Int = 0,
+                            staffB: Int = 0, measureIdR: Int = 0,
                            ) extends Selection
 
 object EventSelection {
   implicit def rw: RW[EventSelection] = macroRW
 }
 
-case class EventSelection(staff: Int = 0,
-                          measureL: Int = 0, eventL: Int = 0, //barLineT: Int = 0,
-                          measureR: Int = 0, eventR: Int = 0//, barLineB: Int = 0
-                         ) extends Selection
+case class EventSelection(sectionIds: Array[Int] = Array(), staff: Int = 0,
+                          //measureL: Int = 0,
+                          //eventL: Int = 0, //barLineT: Int = 0,
+                          meidL: MeasureEventId,
+                          //measureR: Int = 0,
+                          //eventR: Int = 0//, barLineB: Int = 0
+                          meidR: MeasureEventId
+                         ) extends Selection {
 
+  def measureIdL: Int = meidL.measureId
+  def measureIdR: Int = meidR.measureId
+}
 
 /*
 object MultiEventSelection{

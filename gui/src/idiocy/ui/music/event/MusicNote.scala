@@ -1,12 +1,11 @@
-package idiocy.ui.renderer
+package idiocy.ui.music.event
 import java.awt.{Graphics, Point}
 
-import idiocy.music.key.Key
 import idiocy.ui.GlobalUISettings
-import idiocy.ui.clipboard.ClipboardEvent
+import idiocy.ui.renderer.PieceDisplayParams
 import upickle.default.{macroRW, ReadWriter => RW}
 
-object DisplayNote{
+object MusicNote{
   val NoAccidental = 0
   val SharpAccidental = 1
   val FlatAccidental = 2
@@ -18,34 +17,34 @@ object DisplayNote{
   val BeamHeight = 2
   val BeamLength = 6
 
-  implicit def rw: RW[DisplayNote] = macroRW
+  implicit def rw: RW[MusicNote] = macroRW
 }
 
-final case class DisplayNote(lengthPips: Long,
-                       barLocation: Int,
-                       accidental: Int
-                      ) extends DisplayEvent{
+final case class MusicNote(lengthPips: Long,
+                barLocation: Int,
+                accidental: Int
+               ) extends MusicEvent {
   private [this] def renderStem(graphics: Graphics, point: Point, stemUp: Boolean, numBeams: Int): Unit = {
     if(stemUp){
-      graphics.drawLine(point.x + 3, point.y + 2, point.x + 3, point.y - DisplayNote.StemLength)
+      graphics.drawLine(point.x + 3, point.y + 2, point.x + 3, point.y - MusicNote.StemLength)
       if(numBeams >= 1)
-        graphics.fillRect(point.x + 3, point.y - DisplayNote.StemLength,
-          DisplayNote.BeamLength, DisplayNote.BeamHeight)
+        graphics.fillRect(point.x + 3, point.y - MusicNote.StemLength,
+          MusicNote.BeamLength, MusicNote.BeamHeight)
 
       if(numBeams >= 2)
-        graphics.fillRect(point.x + 3, point.y - DisplayNote.StemLength + (DisplayNote.BeamHeight + 2),
-          DisplayNote.BeamLength, DisplayNote.BeamHeight)
+        graphics.fillRect(point.x + 3, point.y - MusicNote.StemLength + (MusicNote.BeamHeight + 2),
+          MusicNote.BeamLength, MusicNote.BeamHeight)
     }
     else {
-      graphics.drawLine(point.x - 2, point.y - 2, point.x - 2, point.y + DisplayNote.StemLength)
+      graphics.drawLine(point.x - 2, point.y - 2, point.x - 2, point.y + MusicNote.StemLength)
 
       if(numBeams >= 1)
-        graphics.fillRect(point.x - 2 - DisplayNote.BeamLength, point.y + DisplayNote.StemLength + 1 - DisplayNote.BeamHeight,
-          DisplayNote.BeamLength, DisplayNote.BeamHeight)
+        graphics.fillRect(point.x - 2 - MusicNote.BeamLength, point.y + MusicNote.StemLength + 1 - MusicNote.BeamHeight,
+          MusicNote.BeamLength, MusicNote.BeamHeight)
 
       if(numBeams >= 2)
-        graphics.fillRect(point.x - 2 - DisplayNote.BeamLength, point.y + DisplayNote.StemLength - (2*DisplayNote.BeamHeight + 1),
-          DisplayNote.BeamLength, DisplayNote.BeamHeight)
+        graphics.fillRect(point.x - 2 - MusicNote.BeamLength, point.y + MusicNote.StemLength - (2*MusicNote.BeamHeight + 1),
+          MusicNote.BeamLength, MusicNote.BeamHeight)
     }
   }
 
@@ -64,34 +63,34 @@ final case class DisplayNote(lengthPips: Long,
   def render(graphics: Graphics, point: Point, stemUp: Boolean, displayParams: PieceDisplayParams): Unit = {
     graphics.setColor(GlobalUISettings.palette.noteColor)
     lengthPips match {
-      case DisplayEvent.Whole =>
+      case MusicEvent.Whole =>
         renderNote(graphics, filled = false, point, displayParams)
-      case DisplayEvent.DottedHalf =>
+      case MusicEvent.DottedHalf =>
         renderNote(graphics, filled = false, point, displayParams)
         renderDot(graphics, point)
         renderStem(graphics, point, stemUp, 0)
-      case DisplayEvent.Half =>
+      case MusicEvent.Half =>
         renderNote(graphics, filled = false, point, displayParams)
         renderStem(graphics, point, stemUp, 0)
-      case DisplayEvent.DottedQuarter =>
+      case MusicEvent.DottedQuarter =>
         renderStem(graphics, point, stemUp, 0)
         renderNote(graphics, filled = true, point, displayParams)
         renderDot(graphics, point)
-      case DisplayEvent.Quarter =>
+      case MusicEvent.Quarter =>
         renderStem(graphics, point, stemUp, 0)
         renderNote(graphics, filled = true, point, displayParams)
-      case DisplayEvent.DottedEighth =>
+      case MusicEvent.DottedEighth =>
         renderStem(graphics, point, stemUp, 1)
         renderNote(graphics, filled = true, point, displayParams)
         renderDot(graphics, point)
-      case DisplayEvent.Eighth =>
+      case MusicEvent.Eighth =>
         renderStem(graphics, point, stemUp, 1)
         renderNote(graphics, filled = true, point, displayParams)
-      case DisplayEvent.DottedSixteenth =>
+      case MusicEvent.DottedSixteenth =>
         renderStem(graphics, point, stemUp, 2)
         renderNote(graphics, filled = true, point, displayParams)
         renderDot(graphics, point)
-      case DisplayEvent.Sixteenth =>
+      case MusicEvent.Sixteenth =>
         renderStem(graphics, point, stemUp, 2)
         renderNote(graphics, filled = true, point, displayParams)
       case _ =>

@@ -3,33 +3,33 @@ package idiocy.ui
 import java.awt.event.{KeyEvent, KeyListener}
 
 import idiocy.ui.action.{BackspaceAtCursor, InsertNoteAtCursor, InsertRestAtCursor}
-import idiocy.ui.renderer.DisplayEvent
+import idiocy.ui.music.event.MusicEvent
 
 class Keys(document: Document) extends KeyListener{
   override def keyTyped(keyEvent: KeyEvent): Unit = {
     val kc = keyEvent.getKeyChar
     kc match{
       case 'q' =>
-        document.doAction(new InsertNoteAtCursor(DisplayEvent.Whole, 0))
+        document.doAction(new InsertNoteAtCursor(MusicEvent.Whole, 0))
       case 'W' =>
-        document.doAction(new InsertNoteAtCursor(DisplayEvent.DottedHalf, 0))
+        document.doAction(new InsertNoteAtCursor(MusicEvent.DottedHalf, 0))
       case 'w' =>
-        document.doAction(new InsertNoteAtCursor(DisplayEvent.Half, 0))
-      case 'E' => document.doAction(new InsertNoteAtCursor(DisplayEvent.DottedQuarter, 0))
-      case 'e' => document.doAction(new InsertNoteAtCursor(DisplayEvent.Quarter, 0))
-      case 'R' => document.doAction(new InsertNoteAtCursor(DisplayEvent.DottedEighth, 0))
-      case 'r' => document.doAction(new InsertNoteAtCursor(DisplayEvent.Eighth, 0))
-      case 'T' => document.doAction(new InsertNoteAtCursor(DisplayEvent.DottedSixteenth, 0))
-      case 't' => document.doAction(new InsertNoteAtCursor(DisplayEvent.Sixteenth, 0))
-      case 'a' => document.doAction(new InsertRestAtCursor(DisplayEvent.Whole))
-      case 'S' => document.doAction(new InsertRestAtCursor(DisplayEvent.DottedHalf))
-      case 's' => document.doAction(new InsertRestAtCursor(DisplayEvent.Half))
-      case 'D' => document.doAction(new InsertRestAtCursor(DisplayEvent.DottedQuarter))
-      case 'd' => document.doAction(new InsertRestAtCursor(DisplayEvent.Quarter))
-      case 'F' => document.doAction(new InsertRestAtCursor(DisplayEvent.DottedEighth))
-      case 'f' => document.doAction(new InsertRestAtCursor(DisplayEvent.Eighth))
-      case 'G' => document.doAction(new InsertRestAtCursor(DisplayEvent.DottedSixteenth))
-      case 'g' => document.doAction(new InsertRestAtCursor(DisplayEvent.Sixteenth))
+        document.doAction(new InsertNoteAtCursor(MusicEvent.Half, 0))
+      case 'E' => document.doAction(new InsertNoteAtCursor(MusicEvent.DottedQuarter, 0))
+      case 'e' => document.doAction(new InsertNoteAtCursor(MusicEvent.Quarter, 0))
+      case 'R' => document.doAction(new InsertNoteAtCursor(MusicEvent.DottedEighth, 0))
+      case 'r' => document.doAction(new InsertNoteAtCursor(MusicEvent.Eighth, 0))
+      case 'T' => document.doAction(new InsertNoteAtCursor(MusicEvent.DottedSixteenth, 0))
+      case 't' => document.doAction(new InsertNoteAtCursor(MusicEvent.Sixteenth, 0))
+      case 'a' => document.doAction(new InsertRestAtCursor(MusicEvent.Whole))
+      case 'S' => document.doAction(new InsertRestAtCursor(MusicEvent.DottedHalf))
+      case 's' => document.doAction(new InsertRestAtCursor(MusicEvent.Half))
+      case 'D' => document.doAction(new InsertRestAtCursor(MusicEvent.DottedQuarter))
+      case 'd' => document.doAction(new InsertRestAtCursor(MusicEvent.Quarter))
+      case 'F' => document.doAction(new InsertRestAtCursor(MusicEvent.DottedEighth))
+      case 'f' => document.doAction(new InsertRestAtCursor(MusicEvent.Eighth))
+      case 'G' => document.doAction(new InsertRestAtCursor(MusicEvent.DottedSixteenth))
+      case 'g' => document.doAction(new InsertRestAtCursor(MusicEvent.Sixteenth))
       case _ =>
     }
   }

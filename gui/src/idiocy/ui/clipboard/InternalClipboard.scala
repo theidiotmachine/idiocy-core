@@ -4,9 +4,11 @@ sealed trait ClipboardContents
 
 case class ClipboardContentsEmpty() extends ClipboardContents
 
-case class ClipboardContentsEvents(data: Array[ClipboardMeasure]) extends ClipboardContents
+//case class ClipboardContentsEvents(data: Array[ClipboardMeasure]) extends ClipboardContents
+case class ClipboardContentsEvents(data: Array[ClipboardEventSet]) extends ClipboardContents
 
-case class ClipboardContentsMeasures(data: Array[Array[ClipboardMeasure]]) extends ClipboardContents
+//case class ClipboardContentsMeasures(data: Array[Array[ClipboardMeasure]]) extends ClipboardContents
+case class ClipboardContentsMeasures(data: Array[Array[ClipboardEventSet]]) extends ClipboardContents
 
 case class InternalClipboard(contents: ClipboardContents = ClipboardContentsEmpty()) {
 

@@ -9,9 +9,14 @@ object PieceDisplayParams{
   val TrackTypeAltoStaff = 3
 }
 
+/**
+  * mutable display data that we don't want to undo
+  * @param trackVisibility
+  * @param showAsTraditionalKeySig
+  */
 class PieceDisplayParams(val trackVisibility: ArrayBuffer[Boolean] = ArrayBuffer(),
                          var showAsTraditionalKeySig: Boolean = true) {
-  var numMeasuresPerLine = 0
+  def addNewTrack(): Unit = trackVisibility += true
 
   def staffLineSeparationPixels: Int = (staffLinePix1 * vZoom).toInt
   def staffLineWidthPixels: Int = 1

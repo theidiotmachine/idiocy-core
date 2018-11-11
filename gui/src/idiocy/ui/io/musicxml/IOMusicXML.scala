@@ -3,6 +3,8 @@ package idiocy.ui.io.musicxml
 import idiocy.music.key.Key
 import idiocy.ui.Document
 import idiocy.ui.data.TimeSig
+import idiocy.ui.music.GrandStaff
+import idiocy.ui.music.event.MusicEvent
 import idiocy.ui.renderer._
 import javax.xml.parsers.SAXParser
 
@@ -25,10 +27,12 @@ final case class MusicXMLPartId(id: String, instrumentName: Option[String], part
 object IOMusicXML {
   private [this] def divisionsToPips(durationInDivisions: Int, numDivisionsPerQuarterNote: Int): Long = {
     val numQuarterNotes = durationInDivisions.toDouble / numDivisionsPerQuarterNote.toDouble
-    (DisplayEvent.PipsToABeat * numQuarterNotes).toLong
+    (MusicEvent.PipsToABeat * numQuarterNotes).toLong
   }
 
   def read(dirName: String, fName: String, doc: Document): Unit = {
+    ???
+    /*
     val xmlElem: Elem = ThisXML.loadFile(dirName + "/" +fName)
 
     if(xmlElem.label != "score-partwise"){
@@ -53,8 +57,11 @@ object IOMusicXML {
       scorePartwiseElem.child.find(c=>{c.label == "part" && c.attribute("id").get.text == pid.id}).get
     })
 
-    val staffs = ArrayBuffer[DisplayGrandStaff]()
+    val staffs = ArrayBuffer[GrandStaff]()
     var staffId = 0
+
+
+
     partNodes.foreach(c=>{
       val measureNodes = c.child.filter(c1=>c1.label == "measure")
 
@@ -87,10 +94,11 @@ object IOMusicXML {
                   val pitchNode = c1.child.find(c2=>c2.label == "pitch").get
                   val step = pitchNode.child.find(c2=>c2.label == "step").get.text
                   val octave = pitchNode.child.find(c2=>c2.label == "octave").get.text.toInt
-
+???
                   eventSets += new DisplayEventSet(Array[DisplayEvent](
-                    new DisplayNote(durationInPips,
-                      DisplayGrandStaff.pitchClassNameAndOctaveNumberToBarLine(step, octave), 0)),
+                  //  new DisplayNote(durationInPips,
+                    //  DisplayGrandStaff.pitchClassNameAndOctaveNumberToBarLine(step, octave), 0)
+                  ),
                     durationInPips)
                 } else {
                   eventSets += new DisplayEventSet(Array[DisplayEvent](
@@ -106,11 +114,13 @@ object IOMusicXML {
         }
       )
 
-      staffs += new DisplayGrandStaff(measures.toArray)
+      staffs += new GrandStaff(measures.toArray)
       doc.displayParams.trackVisibility += true
       staffId += 1
     })
 
-    doc.displayPiece = new DisplayPiece(new DisplaySystem(staffs.toArray))
+    //doc.displayPiece = new DisplayPiece(new DisplaySystem(staffs.toArray))
+
+    */
   }
 }

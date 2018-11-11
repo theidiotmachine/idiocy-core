@@ -8,6 +8,6 @@ object GlobalUISettings{
   var palette: Palette = SolarizedLight
   def setPalette(p: Palette): Unit = palette = p
 
-  var noteFont: Font = null
-
+  var noteFont: Font = _
+  var sectionNameFont: Font = _
 }

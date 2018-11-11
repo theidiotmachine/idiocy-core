@@ -8,6 +8,7 @@ import javax.swing._
 class Main extends Runnable{
 
   GlobalUISettings.noteFont = new Font("Sans", Font.PLAIN, 20)
+  GlobalUISettings.sectionNameFont = new Font("Serif", Font.PLAIN, 20)
 
   override def run(): Unit = {
     val doc = new Document

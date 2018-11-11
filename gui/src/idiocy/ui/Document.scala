@@ -9,7 +9,8 @@ import idiocy.ui.component.MusicComponent
 import idiocy.ui.forms.PaletteChooser
 import idiocy.ui.io.idiocy.IOIdiocy
 import idiocy.ui.io.musicxml.IOMusicXML
-import idiocy.ui.renderer.{DisplayPiece, DisplaySystem, PieceDisplayParams}
+import idiocy.ui.music.{LeafSection, MusicSystem, Piece}
+import idiocy.ui.renderer.PieceDisplayParams
 import javax.swing._
 
 import scala.collection.mutable.ArrayBuffer
@@ -23,8 +24,41 @@ class JavaRepaintCallback(document: Document){
 }
 
 class Document {
+  private [this] def calcNumMeasuresPerLine(canvasWidth: Int,
+                                            displayParams: PieceDisplayParams): Int = {
+    val drawWidth = canvasWidth - displayParams.clefWidthPixels
+    var found = false
+    var numMeasuresPerLine = 1
+    while (!found) {
+      val pix = numMeasuresPerLine * (displayParams.maxMeasureWidthPixels + 1) //1 is the line between staffs
+      if (pix < drawWidth) {
+        numMeasuresPerLine = numMeasuresPerLine match{
+          case 1 => 2
+          case 2 => 4
+          case _ => numMeasuresPerLine + 4
+        }
+      } else {
+        found = true
+      }
+    }
+
+    numMeasuresPerLine
+  }
+
+  //argh
+  private [this] var numMeasuresPerLine = 0
+
+  def render(graphics: Graphics, canvas: Dimension, selection: Selection, displayParams: PieceDisplayParams): Unit = {
+    val offset = new Point(displayParams.borderSizePix, displayParams.borderSizePix)
+    val newCanvas = new Dimension(canvas.width - displayParams.borderSizePix * 2, canvas.height - displayParams.borderSizePix)
+
+    numMeasuresPerLine = calcNumMeasuresPerLine(newCanvas.width, displayParams)
+
+    piece.render(graphics, offset, newCanvas, numMeasuresPerLine, cursor, selection, displayParams)
+  }
+
   def copyToClipboard(): Unit = {
-    Main.clipboard = displayPiece.copyToClipboard(selection)
+    Main.clipboard = piece.copyToClipboard(selection)
   }
 
   def paste(): Unit = {
@@ -56,7 +90,7 @@ class Document {
   }
 
   def selectionMove(direction: Int): Unit = {
-    val (newCursor, newSelection) = displayPiece.selectionMove(cursor, selection, direction, displayParams)
+    val (newCursor, newSelection) = piece.selectionMove(cursor, selection, direction, numMeasuresPerLine, displayParams)
     selection = newSelection
     cursor = newCursor
     repaintCallBack()
@@ -64,18 +98,18 @@ class Document {
 
   val displayParams: PieceDisplayParams = new PieceDisplayParams()
 
-  var displayPiece: DisplayPiece = new DisplayPiece(new DisplaySystem(Array()))
-
-  var cursor: Cursor = Cursor()
+  //new
+  var piece: Piece = new Piece(new LeafSection("Section 1", new MusicSystem(Array())))
+  var cursor: Cursor = Cursor.emptyCursor
   var selection: Selection = NoSelection()
-
 
   var fName: String = ""
   var dirName: String = ""
 
   def cursorMove(direction: Int): Unit = {
-    val (newCursor, newSelection)  = displayPiece.cursorMove(cursor, direction, displayParams)
-    selection = newSelection
+    val newCursor = piece.cursorMove(cursor, direction, numMeasuresPerLine, displayParams)
+    selection = NoSelection()
+
     cursor = newCursor
     repaintCallBack()
   }
@@ -89,8 +123,8 @@ class Document {
   def doAction(action: UserAction): Unit = {
     undoStack.+=(action)
     redoStack.clear()
-    val actionResult = action.apply(displayPiece, displayParams, cursor, selection)
-    displayPiece = actionResult.displayPiece
+    val actionResult = action.apply(piece, displayParams, cursor, selection)
+    piece = actionResult.piece
     cursor = actionResult.cursor
     selection = actionResult.selection
     if(actionResult.redraw)
@@ -102,8 +136,8 @@ class Document {
       val head = undoStack.last
       undoStack.remove(undoStack.length - 1, 1)
       redoStack += head
-      val actionResult = head.undo(displayPiece, displayParams, cursor, selection)
-      displayPiece = actionResult.displayPiece
+      val actionResult = head.undo(piece, displayParams, cursor, selection)
+      piece = actionResult.piece
       cursor = actionResult.cursor
       selection = actionResult.selection
       if (actionResult.redraw)
@@ -116,8 +150,8 @@ class Document {
       val head = redoStack.last
       redoStack.remove(redoStack.length - 1, 1)
       undoStack += head
-      val actionResult = head.apply(displayPiece, displayParams, cursor, selection)
-      displayPiece = actionResult.displayPiece
+      val actionResult = head.apply(piece, displayParams, cursor, selection)
+      piece = actionResult.piece
       cursor = actionResult.cursor
       selection = actionResult.selection
       if (actionResult.redraw)
@@ -143,7 +177,7 @@ class Document {
   }
 
   private def docToReadInto: (Document, Boolean) = {
-    val (doc, newDoc) = if (displayPiece.isEmpty && undoStack.isEmpty && redoStack.isEmpty) {
+    val (doc, newDoc) = if (piece.isEmpty && undoStack.isEmpty && redoStack.isEmpty) {
       (this, false)
     } else {
       (new Document, true)
@@ -187,14 +221,20 @@ class Document {
   }
 
   def showAll(): Unit = {
+    ???
+    /*
     displayParams.trackVisibility.transform(_=>true)
     repaintCallBack()
+    */
   }
 
   def hideAllButThis(): Unit = {
+    ???
+    /*
     displayParams.trackVisibility.transform(_=>false)
     displayParams.trackVisibility(cursor.staff) = true
     repaintCallBack()
+    */
   }
 
   def newDocument(): Unit = {
@@ -289,13 +329,6 @@ class Document {
     newMenuItem(showHideMenu, "Show All", (_:ActionEvent)=>showAll())
     newMenuItem(showHideMenu, "Hide Everything Else", (_:ActionEvent)=>hideAllButThis())
 
-    /*
-    val insertMenu = new JMenu("Insert")
-    menuBar.add(insertMenu)
-    newMenuItem(insertMenu, "New Grand Staff", (_: ActionEvent)=>doAction(new AddGrandStaff))
-    newMenuItem(insertMenu, "Measure", (_: ActionEvent)=>doAction(new InsertMeasureAtCursor))
-*/
-
     val pieceMenu = new JMenu("Piece")
     menuBar.add(pieceMenu)
     newMenuItem(pieceMenu, "New Grand Staff", (_: ActionEvent)=>doAction(new AddGrandStaff))
@@ -313,6 +346,8 @@ class Document {
     mc.requestFocus()
 
     repaintCallBack = ()=>mc.repaint()
+
+    //mc.getGraphics
 
     frame.getContentPane.add(mc)
 

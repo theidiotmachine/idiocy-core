@@ -1,11 +1,12 @@
-package idiocy.ui.renderer
+package idiocy.ui.music.event
 
 import java.awt.{Graphics, Point}
 
 import idiocy.ui.GlobalUISettings
+import idiocy.ui.renderer.PieceDisplayParams
 
 
-trait DisplayRest extends DisplayEvent{
+trait MusicRest extends MusicEvent{
   val lengthPips: Long
 
   private[this] def renderDot(graphics: Graphics, point: Point): Unit = {
@@ -19,27 +20,27 @@ trait DisplayRest extends DisplayEvent{
     val fontHeight = fontMetrics.getHeight
     val fontAscent = fontMetrics.getAscent
     lengthPips match {
-      case DisplayEvent.Whole =>
+      case MusicEvent.Whole =>
         graphics.fillRect(point.x - 5, point.y - displayParams.staffLineSeparationPixels, 10, 5)
-      case DisplayEvent.DottedHalf =>
+      case MusicEvent.DottedHalf =>
         renderDot(graphics, point)
         graphics.fillRect(point.x - 5, point.y - 4, 10, 5)
-      case DisplayEvent.Half =>
+      case MusicEvent.Half =>
         graphics.fillRect(point.x - 5, point.y - 4, 10, 5)
-      case DisplayEvent.Quarter =>
+      case MusicEvent.Quarter =>
         graphics.drawString("\uD834\uDD3D", point.x, point.y - fontHeight / 2 + fontAscent)
-      case DisplayEvent.DottedQuarter =>
+      case MusicEvent.DottedQuarter =>
         graphics.drawString("\uD834\uDD3D", point.x, point.y - fontHeight / 2 + fontAscent)
         renderDot(graphics, point)
-      case DisplayEvent.Eighth =>
+      case MusicEvent.Eighth =>
         graphics.drawString("\uD834\uDD3E", point.x, point.y - fontHeight / 2 + fontAscent)
-      case DisplayEvent.DottedEighth =>
+      case MusicEvent.DottedEighth =>
         graphics.drawString("\uD834\uDD3E", point.x, point.y - fontHeight / 2 + fontAscent)
         renderDot(graphics, point)
-      case DisplayEvent.DottedSixteenth =>
+      case MusicEvent.DottedSixteenth =>
         graphics.drawString("\uD834\uDD3F", point.x, point.y - fontHeight / 2 + fontAscent)
         renderDot(graphics, point)
-      case DisplayEvent.Sixteenth =>
+      case MusicEvent.Sixteenth =>
         graphics.drawString("\uD834\uDD3F", point.x, point.y - fontHeight / 2 + fontAscent)
       case _ => graphics.drawString("?", point.x, point.y)
     }
