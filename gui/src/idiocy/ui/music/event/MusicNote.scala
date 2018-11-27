@@ -20,7 +20,7 @@ object MusicNote{
   implicit def rw: RW[MusicNote] = macroRW
 }
 
-final case class MusicNote(lengthPips: Long,
+final case class MusicNote(lengthPips: Int,
                 barLocation: Int,
                 accidental: Int
                ) extends MusicEvent {

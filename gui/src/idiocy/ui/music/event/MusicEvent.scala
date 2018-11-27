@@ -15,5 +15,5 @@ object MusicEvent{
 }
 
 trait MusicEvent {
-  val lengthPips: Long
+  val lengthPips: Int
 }

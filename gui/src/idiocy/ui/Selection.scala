@@ -29,11 +29,9 @@ object EventSelection {
 }
 
 case class EventSelection(sectionIds: Array[Int] = Array(), staff: Int = 0,
-                          //measureL: Int = 0,
-                          //eventL: Int = 0, //barLineT: Int = 0,
+                          //barLineT: Int = 0,
                           meidL: MeasureEventId,
-                          //measureR: Int = 0,
-                          //eventR: Int = 0//, barLineB: Int = 0
+                          //, barLineB: Int = 0
                           meidR: MeasureEventId
                          ) extends Selection {
 

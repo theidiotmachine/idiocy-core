@@ -8,5 +8,5 @@ object TimeSigEvent{
 }
 
 final case class TimeSigEvent(timeSig: TimeSig) extends MusicEvent {
-  override val lengthPips: Long = 0
+  override val lengthPips: Int = 0
 }

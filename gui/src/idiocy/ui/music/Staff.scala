@@ -5,9 +5,15 @@ import java.awt.{Dimension, Graphics, Point}
 import idiocy.music.key.Key
 import idiocy.ui.clipboard.ClipboardEventSet
 import idiocy.ui.data.TimeSig
-import idiocy.ui.music.event.MusicEventSet
+import idiocy.ui.music.event.{MusicEventSet, TimeSigEvent}
 import idiocy.ui.renderer.PieceDisplayParams
 import idiocy.ui._
+
+import scala.collection.mutable.ArrayBuffer
+
+object Staff{
+
+}
 
 trait Staff {
   val events: Array[MusicEventSet]
@@ -33,7 +39,7 @@ trait Staff {
              selection: Selection,
              displayParams: PieceDisplayParams): Unit
   def getClipboardEventsFromSelection(selection: EventSelection): Array[ClipboardEventSet]
-  def getClipboardEventsFromSelection(selection: MeasureSelection): Array[Array[ClipboardEventSet]]
+  def getClipboardEventsFromSelection(selection: MeasureSelection): Array[ClipboardEventSet]
 
   def getTimeSig(eventId: Int): TimeSig = {
     var i = math.min(eventId, events.length - 1)
@@ -58,9 +64,10 @@ trait Staff {
   }
 
   def getMeasure(measureIdx: Int): Option[Measure]
+  def getMeasureUnsafe(measureIdx: Int): Measure
   def numMeasures: Int
 
-  def cursorMoveStaff(cursor: Cursor, direction: Int): Option[Cursor]
+  def cursorMoveVerticalWithinStaff(cursor: Cursor, direction: Int): Option[Cursor]
 
   /*
   def cursorMoveLeftOneMeasureHorizontally(cursor: Cursor): Option[Cursor] = {
@@ -160,7 +167,7 @@ trait Staff {
           else
             Some(cursor)
         } else
-          Some(cursor.prevEvent)
+          Some(Cursor(cursor.sectionIds, cursor.staff, cursor.measureEventId.prevEvent, cursor.barLine))
 
       case Cursor.CONTROL_LEFT =>
         if(cursor.measureEventId.measureId > 0)
@@ -179,7 +186,7 @@ trait Staff {
             } else
               Some(cursor.startOfNextMeasure)
           } else {
-            Some(cursor.nextEvent)
+            Some(Cursor(cursor.sectionIds, cursor.staff, cursor.measureEventId.nextEvent, cursor.barLine))
           }
         } else {
           if(numMeasures == 0)
@@ -201,10 +208,10 @@ trait Staff {
           Some(Cursor(cursor.sectionIds, cursor.staff, 0, 0, cursor.barLine))
 
       case Cursor.UP =>
-        cursorMoveStaff(cursor, direction)
+        cursorMoveVerticalWithinStaff(cursor, direction)
 
       case Cursor.DOWN =>
-        cursorMoveStaff(cursor, direction)
+        cursorMoveVerticalWithinStaff(cursor, direction)
 
       case Cursor.CONTROL_DOWN | Cursor.CONTROL_UP =>
         None
@@ -238,7 +245,13 @@ trait Staff {
     })
   }
 
-  protected def trueUpCursor(cursor: Cursor): Cursor = {
+  /**
+    * This is a necessary evil right now. It moves the cu
+    * @param cursor in
+    * @return
+    */
+  /*
+  protected def trueUpCursorForward(cursor: Cursor): Cursor = {
     var measureEventId = cursor.measureEventId
     var looping = true
     while(looping){
@@ -253,7 +266,7 @@ trait Staff {
         looping = false
     }
     new Cursor(cursor.sectionIds, cursor.staff, measureEventId, cursor.barLine)
-  }
+  }*/
 
   def getStaffEventIdFromMeasureEventId(meid: MeasureEventId): Int = {
     val oMeasure = getMeasure(meid.measureId)
@@ -264,4 +277,35 @@ trait Staff {
       0
   }
 
+  def getLastMeasureEventId: MeasureEventId = {
+    val measureId = numMeasures - 1
+    val measure = getMeasureUnsafe(measureId)
+    val eventId = math.max(measure.numEvents - 1, 0)
+    MeasureEventId(measureId, eventId)
+  }
+
+  def getMeasureEventIdFromStaffEventId(eventId: Int): MeasureEventId = {
+    //the dumb way
+    var measureId = 0
+    var i = 0
+    var found = false
+    var out: Option[MeasureEventId] = None
+    while(!found && measureId < numMeasures){
+      var j = 0
+      val measure = getMeasureUnsafe(measureId)
+      while(!found && j < measure.numEvents){
+        if(i == eventId){
+          out = Some(MeasureEventId(measureId, j))
+          found = true
+        }
+
+        j += 1
+        i += 1
+      }
+
+      measureId += 1
+    }
+
+    out.getOrElse(getLastMeasureEventId)
+  }
 }

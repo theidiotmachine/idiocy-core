@@ -7,6 +7,8 @@ import idiocy.ui._
 import idiocy.ui.renderer.PieceDisplayParams
 import idiocy.ui.utils.ArrayUtils
 
+import scala.collection.mutable.ArrayBuffer
+
 class MusicSystem(val staffs: Array[Staff]) {
 
 
@@ -580,6 +582,16 @@ class MusicSystem(val staffs: Array[Staff]) {
     staffs(selection.staff).getClipboardEventsFromSelection(selection)
   }
 
+  private [this] def getClipboardMultiEventsFromSelection(selection: MeasureSelection): Array[Array[ClipboardEventSet]] = {
+    var i = selection.staffT
+    var out = ArrayBuffer[Array[ClipboardEventSet]]()
+    while(i <= selection.staffB){
+      out += staffs(i).getClipboardEventsFromSelection(selection)
+      i += 1
+    }
+    out.toArray
+  }
+
   def copyToClipboard(selection: Selection): InternalClipboard = {
     selection match{
       case _: NoSelection =>
@@ -587,8 +599,7 @@ class MusicSystem(val staffs: Array[Staff]) {
       case eventSelection: EventSelection =>
         InternalClipboard(ClipboardContentsEvents(getClipboardEventsFromSelection(eventSelection)))
       case measureSelection: MeasureSelection =>
-        //InternalClipboard(ClipboardContentsMeasures(getClipboardMultiEventsFromSelection(measureSelection)))
-        ???
+        InternalClipboard(ClipboardContentsMeasures(getClipboardMultiEventsFromSelection(measureSelection)))
     }
   }
 }

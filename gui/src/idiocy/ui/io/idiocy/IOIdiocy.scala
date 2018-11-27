@@ -75,7 +75,7 @@ object IOIdiocy {
 
   private [this] def readEventSet(js: Js): MusicEventSet = {
     val events = js("events").arr.map(e=>readEvent(e)).toArray
-    val lengthPips = js("lengthPips").num.toLong
+    val lengthPips = js("lengthPips").num.toInt
     new MusicEventSet(events, lengthPips)
   }
 

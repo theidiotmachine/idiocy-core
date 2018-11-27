@@ -75,12 +75,34 @@ final case class GrandStaffMeasure(timeSig: TimeSig, events: Array[MusicEventSet
 
   }
 
+
+
   private def renderEvents(graphics: Graphics, offset: Point, bar0Offs: Int,
                            canvas: Dimension, displayParams: PieceDisplayParams): Unit = {
     var i = 0
     while (i < events.length) {
       var j = 0
       val thisEvents = events(i)
+
+      val upperStemCalculator = new StemCalculator
+      val lowerStemCalculator = new StemCalculator
+      while(j < thisEvents.length) {
+        thisEvents(j) match {
+          case musicNote: MusicNote =>
+            if(musicNote.barLocation > 0)
+              upperStemCalculator.addNote(musicNote, GrandStaff.UpperRestBarLine)
+            else if(musicNote.barLocation < 0)
+              lowerStemCalculator.addNote(musicNote, GrandStaff.LowerRestBarLine)
+          case _ =>
+        }
+
+         j += 1
+      }
+
+      upperStemCalculator.calculate()
+      lowerStemCalculator.calculate()
+
+      j = 0
       while(j < thisEvents.length) {
         thisEvents(j) match {
           case musicNote: MusicNote =>
@@ -109,8 +131,14 @@ final case class GrandStaffMeasure(timeSig: TimeSig, events: Array[MusicEventSet
               }
             }
 
-            val stemUp = musicNote.barLocation < 6 && musicNote.barLocation > 0 ||
-              musicNote.barLocation < -6
+            val stemUp = if(musicNote.barLocation > 0)
+                upperStemCalculator.stemUp
+              else if(musicNote.barLocation < 0)
+                lowerStemCalculator.stemUp
+              else {
+                upperStemCalculator.outerDown > lowerStemCalculator.outerUp
+              }
+
             musicNote.render(graphics, notePoint, stemUp, displayParams)
           case partialRest: PartialRest =>
             val xOffs = xEventLoc(i, canvas)

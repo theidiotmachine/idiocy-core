@@ -54,8 +54,4 @@ case class Cursor(sectionIds: Array[Int],
 
   def upABarLine: Cursor = Cursor(sectionIds, staff, measureEventId, barLine + 1)
   def downABarLine: Cursor = Cursor(sectionIds, staff, measureEventId, barLine - 1)
-
-  def prevEvent: Cursor = Cursor(sectionIds, staff, measureEventId.prevEvent, barLine)
-  def nextEvent: Cursor = Cursor(sectionIds, staff, measureEventId.nextEvent, barLine)
-
 }

@@ -7,7 +7,7 @@ import idiocy.ui.renderer.PieceDisplayParams
 
 
 trait MusicRest extends MusicEvent{
-  val lengthPips: Long
+  val lengthPips: Int
 
   private[this] def renderDot(graphics: Graphics, point: Point): Unit = {
     graphics.fillRect(point.x + 7, point.y - 1, 3, 3)

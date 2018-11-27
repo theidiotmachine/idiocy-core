@@ -5,7 +5,7 @@ object PartialRest{
   implicit def rw: RW[PartialRest] = macroRW
 }
 
-final case class PartialRest(lengthPips: Long,
+final case class PartialRest(lengthPips: Int,
                              barLocation: Int
                              ) extends MusicRest {
 

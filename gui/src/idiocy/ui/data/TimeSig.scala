@@ -10,5 +10,5 @@ object TimeSig{
 }
 
 case class TimeSig(top: Int, bottom: Int) {
-  def measureLengthPips: Long = MusicEvent.PipsToABeat * 4 * top / bottom
+  def measureLengthPips: Int = MusicEvent.PipsToABeat * 4 * top / bottom
 }

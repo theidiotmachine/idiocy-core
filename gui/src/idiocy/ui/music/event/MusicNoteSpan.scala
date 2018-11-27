@@ -11,7 +11,7 @@ object MusicNoteSpan{
 }
 
 
-final case class MusicNoteSpan(lengthPips: Long, barLocation: Int, accidental: Int) extends MusicEvent{
+final case class MusicNoteSpan(lengthPips: Int, barLocation: Int, accidental: Int) extends MusicEvent{
   def render(graphics: Graphics, spanPoint: Point, displayParams: PieceDisplayParams): Unit = {
     graphics.setColor(GlobalUISettings.palette.spanColor)
     graphics.drawLine(spanPoint.x - 4, spanPoint.y, spanPoint.x + 4, spanPoint.y)

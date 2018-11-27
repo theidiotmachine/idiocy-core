@@ -6,7 +6,7 @@ object FullRest{
   implicit def rw: RW[FullRest] = macroRW
 }
 
-final case class FullRest(lengthPips: Long,
+final case class FullRest(lengthPips: Int,
                           barLocation: Int //just for rendering
                           ) extends MusicRest {
 }

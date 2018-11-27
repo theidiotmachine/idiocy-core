@@ -10,6 +10,7 @@ import idiocy.ui.clipboard._
 import idiocy.ui.data.TimeSig
 import idiocy.ui.utils.ArrayUtils
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 /*
 
@@ -57,8 +58,13 @@ object GrandStaff{
   }
 
   /**
-    * Merge rest events vertically. If there are two rests on the same staff, then replace them with a single rest.
-    * If there are two rest events on both staffs, replace them with a single full rest
+    * Merge rest events vertically.
+    *
+    * If there are two rests on the same staff, then replace them with a single rest.
+    * If there are two rest events on both staffs, replace them with a single full rest.
+    * Remove central partial rests
+    * If there are partial rests on the same line as un-spanned notes, remove them
+    *
     * @param eventSet the event set to fix.
     * @return
     */
@@ -67,11 +73,11 @@ object GrandStaff{
     var lowerFullRests = Array[Int]()
     var upperPartialRests = Array[Int]()
     var upperSpans = Array[Int]()
-    var upperNotes = Array[Int]()
+    var upperNotes = Array[MusicNote]()
     var lowerPartialRests = Array[Int]()
     var lowerSpans = Array[Int]()
-    var lowerNotes = Array[Int]()
-    var centralNotes = Array[Int]()
+    var lowerNotes = Array[MusicNote]()
+    var centralNotes = Array[MusicNote]()
     var centralPartialRests = Array[Int]()
     var centralSpans = Array[Int]()
 
@@ -81,11 +87,11 @@ object GrandStaff{
       event match {
         case note: MusicNote =>
           if (note.barLocation > 0)
-            upperNotes = upperNotes :+ i
+            upperNotes = upperNotes :+ note
           else if (note.barLocation < 0)
-            lowerNotes = lowerNotes :+ i
+            lowerNotes = lowerNotes :+ note
           else
-            centralNotes = centralNotes :+ i
+            centralNotes = centralNotes :+ note
 
         case rest: PartialRest =>
           if (rest.barLocation > 0)
@@ -113,7 +119,26 @@ object GrandStaff{
     }
 
     var newTheseEvents = eventSet
-    //upper
+
+    //I actually can't think of a time when we want central partial rests
+    if(centralPartialRests.nonEmpty){
+      newTheseEvents = newTheseEvents.removeIndexes(centralPartialRests)
+    }
+
+    //we don't want partial rests if there are only notes that are non-spanned
+    if(upperNotes.nonEmpty && upperPartialRests.nonEmpty && upperSpans.isEmpty){
+      val keep = upperNotes.exists(i=>i.lengthPips != eventSet.lengthPips)
+      if(!keep)
+        newTheseEvents = newTheseEvents.removeIndexes(upperPartialRests)
+    }
+
+    if(lowerNotes.nonEmpty && lowerPartialRests.nonEmpty && lowerSpans.isEmpty){
+      val keep = lowerNotes.exists(i=>i.lengthPips != eventSet.lengthPips)
+      if(!keep)
+        newTheseEvents = newTheseEvents.removeIndexes(lowerPartialRests)
+    }
+
+    //checks when there are no notes
     if(upperNotes.isEmpty && upperSpans.isEmpty && centralNotes.isEmpty && centralSpans.isEmpty){
       if(!upperPartialRests.isEmpty){
         //it has only partial rests. strip them out, replace with a full
@@ -142,12 +167,16 @@ object GrandStaff{
     newTheseEvents
   }
 
-  def fixUp(events: Array[MusicEventSet]) :Array[MusicEventSet] = {
+
+  def fixUp(events: Array[MusicEventSet], smoosh: Boolean = true) :Array[MusicEventSet] = {
     //if there are rests missing in, add them in
-    val newEvents = events.map(e => GrandStaff.fixUpRests(e))
+    var out = events.map(e => GrandStaff.fixUpRests(e))
 
     //now smoosh
-    MusicEventSet.smoosh(newEvents)
+    if(smoosh)
+      out = MusicEventSet.smoosh(out)
+
+    MusicEventSet.splitAtMeasureBoundaries(out)
   }
 
   def generateMeasures(events: Array[MusicEventSet]): Array[GrandStaffMeasure] = {
@@ -219,6 +248,102 @@ object GrandStaff{
       out.toArray
     }
   }
+
+  def findEventIndexes(events: Array[MusicEvent], atBarLine: Int): Array[Int] = {
+    var j = 0
+    var out = Array[Int]()
+    while(j < events.length){
+      events(j) match{
+        case note: MusicNote =>
+          if(note.barLocation == atBarLine)
+            out = out :+ j
+        case fullRest: FullRest =>
+          if((fullRest.barLocation > 0 && atBarLine >= 0) || (fullRest.barLocation < 0 && atBarLine <= 0))
+            out = out :+ j
+        case rest: PartialRest =>
+          if(rest.barLocation == atBarLine)
+            out = out :+ j
+        case span: MusicNoteSpan =>
+          if(span.barLocation == atBarLine)
+            out = out :+ j
+        case _ =>
+      }
+      j += 1
+    }
+    out
+  }
+
+  def stripOutBarLine(events: Array[MusicEventSet],
+                      from: Int,
+                      barLocation: Int,
+                      lengthPips: Int): Array[MusicEventSet] = {
+    val unchangedBeginStub = ArrayUtils.subRange(events, 0, from)
+    var out = unchangedBeginStub
+    var remainingLength = lengthPips
+    var i = from
+    var firstIteration = true
+    while(i < events.length && remainingLength > 0){
+      var theseEvents = events(i)
+      val theseEventsLength = theseEvents.lengthPips
+      var eventIndexes = GrandStaff.findEventIndexes(theseEvents.events, barLocation)
+      var j = 0
+      while(j < eventIndexes.length){
+        val eventIndex = eventIndexes(j)
+        val event = theseEvents(eventIndex)
+        event match{
+          case note: MusicNote =>
+            theseEvents = theseEvents.removeIndex(eventIndex)
+            if(!firstIteration)
+              remainingLength += (note.lengthPips - theseEventsLength)
+
+          case fullRest: FullRest =>
+            if((barLocation >= 0 && fullRest.barLocation > 0) || (barLocation <= 0 && fullRest.barLocation < 0) || (barLocation == 0))
+              theseEvents = theseEvents.removeIndex(eventIndex)
+          case _: PartialRest =>
+            theseEvents = theseEvents.removeIndex(eventIndex)
+          case _: MusicNoteSpan =>
+            theseEvents = theseEvents.removeIndex(eventIndex)
+          case _ =>
+        }
+        j += 1
+        eventIndexes = GrandStaff.findEventIndexes(theseEvents.events, barLocation)
+      }
+      remainingLength -= theseEventsLength
+      out = out :+ theseEvents
+      firstIteration = false
+      i += 1
+    }
+
+    if(i < events.length)
+      out = out ++ ArrayUtils.subRange(events, i, events.length)
+
+    out
+  }
+
+  def overwriteRest(events: Array[MusicEventSet],
+                    lengthPips: Int,
+                    eventId: Int, barLine: Int,
+                    smoosh: Boolean = false): Array[MusicEventSet] = {
+    val newEvents: Array[MusicEventSet] = if(eventId >= events.length){
+      events :+ new MusicEventSet(Array[MusicEvent](
+        FullRest(lengthPips, GrandStaff.UpperRestBarLine),
+        FullRest(lengthPips, GrandStaff.LowerRestBarLine)),
+        lengthPips)
+    } else {
+
+      var newEvents = stripOutBarLine(events, eventId, barLine, lengthPips)
+
+      //now put in the rest, possibly splitting
+      newEvents = MusicEventSet.insertPartialRest(newEvents, eventId, lengthPips, barLine)
+
+      //fix up any problems. By not smooshing we let rests get split up
+      newEvents = GrandStaff.fixUp(newEvents, smoosh)
+
+      newEvents
+    }
+
+    newEvents
+  }
 }
 
 class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaffMeasure]) extends Staff {
@@ -247,12 +372,14 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
     SPNPitch(outCPC, octaveNumber)
   }
 
-  override def getClipboardEventsFromSelection(selection: EventSelection): Array[ClipboardEventSet] = {
+  private [this] def getClipboardEventSets(eventSets: Array[MusicEventSet],
+                                           from: Int,
+                                           to: Int,
+                                           initKey: Key): (ArrayBuffer[ClipboardEventSet], Key) = {
     val out = ArrayBuffer[ClipboardEventSet]()
-    var eventId = getStaffEventIdFromMeasureEventId(selection.meidL)
-    val eventIdR = getStaffEventIdFromMeasureEventId(selection.meidR)
-    var key = getKey(eventId)
-    while(eventId < eventIdR){
+    var eventId = from
+    var key = initKey
+    while(eventId < to){
       val eventSet = events(eventId)
       val thisOut = ArrayBuffer[ClipboardEvent]()
 
@@ -272,22 +399,31 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
       out += ces
       eventId += 1
     }
+    (out, key)
+  }
+
+  override def getClipboardEventsFromSelection(selection: EventSelection): Array[ClipboardEventSet] = {
+    var eventIdL = getStaffEventIdFromMeasureEventId(selection.meidL)
+    val eventIdR = getStaffEventIdFromMeasureEventId(selection.meidR)
+    val key = getKey(eventIdL)
+    val (out, _) = getClipboardEventSets(events, eventIdL, eventIdR, key)
+
     out.toArray
   }
 
-  def getClipboardEventsFromSelection(selection: MeasureSelection): Array[Array[ClipboardEventSet]] = {
-    ???
-    /*
-    val out = ArrayBuffer[ClipboardMeasure]()
-    var measureId = selection.measureL
-    while(measureId <= selection.measureR && measureId < measures.length - 1){
+  def getClipboardEventsFromSelection(selection: MeasureSelection): Array[ClipboardEventSet] = {
+    val out = ArrayBuffer[ClipboardEventSet]()
+    var measureId = selection.measureIdL
+    var initEventId = getStaffEventIdFromMeasureEventId(MeasureEventId(selection.measureIdL, 0))
+    var key: Key = getKey(initEventId)
+    while(measureId <= selection.measureIdR && measureId < measures.length - 1){
       val measure = measures(measureId)
-      val ces = measure.getClipboardEventSets(0, measure.events.length)
-      out += new ClipboardMeasure(ces, ClipboardMeasure.MEASURE_TYPE_FULL, ClipboardMeasure.MEASURE_TYPE_FULL)
+      val (thisOut, k) = getClipboardEventSets(measure.events, 0, measure.events.length - 1, key)
+      key = k
+      out ++= thisOut
       measureId += 1
     }
     out.toArray
-     */
   }
 
   override def lineHeightPixels(displayParams: PieceDisplayParams): Int = {
@@ -305,6 +441,10 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
       None
     else
       Some(measures(measureId))
+  }
+
+  def getMeasureUnsafe(measureId: Int): Measure = {
+    measures(measureId)
   }
 
   override def render(graphics: Graphics,
@@ -338,104 +478,79 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
     }
   }
 
+  /**
+    * This is an overwrite implementation. It essentially takes notes and replaces them with rests, ignores rests, and
+    * deletes all other event types
+    *
+    * @param cursor the cursor
+    * @return
+    */
   override def backspaceAtCursor(cursor: Cursor): (Staff, Cursor) = {
-    ???
-    /*
-    if(cursor.event > 0){
-      var eventSet = events(cursor.event - 1)
+    val cursorEventId = getStaffEventIdFromMeasureEventId(cursor.measureEventId) - 1
+    if(cursorEventId >= 0) {
+      val eventSet = events(cursorEventId)
+      val toRemove = ArrayBuffer[Int]()
+      val toReplace = ArrayBuffer[(Int, Int, Int)]()
+      val eventIndexes = GrandStaff.findEventIndexes(eventSet.events, cursor.barLine)
+      var i = 0
+      while(i < eventIndexes.length) {
+        val event = eventSet(eventIndexes(i))
+        event match {
+          case note: MusicNote =>
+            toReplace += ((note.lengthPips, cursorEventId, cursor.barLine))
 
-      var eventIndexes = eventSet.findEventIndexes(cursor.barLine)
-      while(eventIndexes.length > 0){
-        eventSet = eventSet.removeIndex(eventIndexes(0))
-        eventIndexes = eventSet.findEventIndexes(cursor.barLine)
+          case span: MusicNoteSpan =>
+            //step back, find source, strip out bar
+            var j = cursorEventId - 1
+            var looking = true
+            while(j >= 0){
+              val es = events(j)
+              val ei = GrandStaff.findEventIndexes(es.events, cursor.barLine)
+              val oRootNoteIdx = ei.find(eii=>es(eii) match {
+                case note: MusicNote => true
+                case _ => false
+              })
+              oRootNoteIdx.foreach(rootNoteIdx => {
+                val rootNote = es(rootNoteIdx)
+                toReplace += ((rootNote.lengthPips, j, cursor.barLine))
+                looking = false
+              })
+              j -= 1
+            }
+
+          case _: MusicRest => //don't do anything
+
+          case _ =>
+            //this will eventually be things like time sigs
+            toRemove += cursor.barLine
+        }
+        i += 1
       }
 
-      eventSet = DisplayGrandStaffMeasure.fixUpRests(eventSet)
+      var outEvents = ArrayUtils.replaceElem(events, cursorEventId, eventSet.removeIndexes(toRemove.toArray))
+      i = 0
+      while(i < toReplace.length){
+        outEvents = GrandStaff.overwriteRest(outEvents, toReplace(i)._1, toReplace(i)._2, toReplace(i)._3, smoosh = true)
+        i += 1
+      }
 
-      var newEvents = if(eventSet.length > 0)
-        ArrayUtils.replaceElem(events, cursor.event - 1, eventSet)
-      else
-        ArrayUtils.removeIndex(events, cursor.event - 1)
+      outEvents = GrandStaff.fixUp(outEvents)
 
-      //now smoosh
-      newEvents = DisplayEventSet.smoosh(newEvents)
-
-      (new DisplayGrandStaffMeasure(timeSig, bpm, key, newEvents), cursor.prevEvent)
-    }
-    else {
+      val staffOut = new GrandStaff(outEvents, GrandStaff.generateMeasures(outEvents))
+      val oCursorOut = staffOut.cursorMove(cursor, Cursor.LEFT)
+      (staffOut, oCursorOut.get)
+    } else {
       (this, cursor)
     }
-     */
-  }
-
-  private [this] def stripOutBarLine(events: Array[MusicEventSet],
-                                     from: Int,
-                                     barLocation: Int,
-                                     lengthPips: Long): Array[MusicEventSet] = {
-    val unchangedBeginStub = ArrayUtils.subRange(events, 0, from)
-    var out = unchangedBeginStub
-    var remainingLength = lengthPips
-    var i = from
-    var firstIteration = true
-    while(i < events.length && remainingLength > 0){
-      var theseEvents = events(i)
-      val theseEventsLength = theseEvents.lengthPips
-      var eventIndexes = theseEvents.findEventIndexes(barLocation)
-      var j = 0
-      while(j < eventIndexes.length){
-        val eventIndex = eventIndexes(j)
-        val event = theseEvents(eventIndex)
-        event match{
-          case note: MusicNote =>
-            theseEvents = theseEvents.removeIndex(eventIndex)
-            if(!firstIteration)
-              remainingLength += (note.lengthPips - theseEventsLength)
-
-          case fullRest: FullRest =>
-            if((barLocation >= 0 && fullRest.barLocation > 0) || (barLocation <= 0 && fullRest.barLocation < 0) || (barLocation == 0))
-              theseEvents = theseEvents.removeIndex(eventIndex)
-          case _: PartialRest =>
-            theseEvents = theseEvents.removeIndex(eventIndex)
-          case _: MusicNoteSpan =>
-            theseEvents = theseEvents.removeIndex(eventIndex)
-          case _ =>
-        }
-        j += 1
-        eventIndexes = theseEvents.findEventIndexes(barLocation)
-      }
-      remainingLength -= theseEventsLength
-      out = out :+ theseEvents
-      firstIteration = false
-      i += 1
-    }
-
-    if(i < events.length)
-      out = out ++ ArrayUtils.subRange(events, i, events.length)
-
-    out
   }
 
   override def insertRestAtCursor(lengthPips: Int, cursor: Cursor): (Staff, Cursor) = {
     //this is all overwrite mode
     val cursorEventId = getStaffEventIdFromMeasureEventId(cursor.measureEventId)
-    val newEvents: Array[MusicEventSet] = if(cursorEventId >= events.length){
-      events :+ new MusicEventSet(Array[MusicEvent](
-        FullRest(lengthPips, GrandStaff.UpperRestBarLine),
-        FullRest(lengthPips, GrandStaff.LowerRestBarLine)),
-        lengthPips)
-    } else {
-
-      var newEvents = stripOutBarLine(events, cursorEventId, cursor.barLine, lengthPips)
-
-      //now put in the rest, possibly splitting
-      newEvents = MusicEventSet.addInLongRest(newEvents, cursorEventId, lengthPips, cursor.barLine)
-
-      //fix up any problems
-      newEvents = GrandStaff.fixUp(newEvents)
-
-      newEvents
-    }
-    (new GrandStaff(newEvents, GrandStaff.generateMeasures(newEvents)), cursor.nextEvent)
+    val newEvents = GrandStaff.overwriteRest(events, lengthPips, cursorEventId, cursor.barLine)
+    val newGS = new GrandStaff(newEvents, GrandStaff.generateMeasures(newEvents))
+    val oCursorOut = newGS.cursorMove(cursor, Cursor.RIGHT)
+    (newGS, oCursorOut.get)
   }
 
   override def insertNoteAtCursor(lengthPips: Int, noteIdModifier: Int, cursor: Cursor): (Staff, Cursor) = {
@@ -459,10 +574,10 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
           ), lengthPips)
       } else {
         //strip out whatever is on this bar line, possibly including future notes
-        var newEvents = stripOutBarLine(events, cursorEventId, cursor.barLine, lengthPips)
+        var newEvents = GrandStaff.stripOutBarLine(events, cursorEventId, cursor.barLine, lengthPips)
 
         //now put in the note, possibly splitting
-        newEvents = MusicEventSet.addInLongNote(newEvents, cursorEventId,
+        newEvents = MusicEventSet.insertNote(newEvents, cursorEventId,
           new MusicNote(lengthPips, cursor.barLine, noteIdModifier))
 
         //fix up any problems
@@ -471,99 +586,97 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
         newEvents
       }
     val newGS = new GrandStaff(newEvents, GrandStaff.generateMeasures(newEvents))
-    val newCursor = newGS.trueUpCursor(cursor.nextEvent)
-    (newGS, newCursor)
+    val oCursorOut = newGS.cursorMove(cursor, Cursor.RIGHT)
+    (newGS, oCursorOut.get)
   }
 
   override def insertMeasuresAtCursor(cursor: Cursor, numMeasures: Int): (Staff, Cursor) = {
-???
-    /*
-    val measure = measures(cursor.measure)
-    if(cursor.event == 0)
-      (insertMeasures(cursor.measure, numMeasures), cursor)
-    else if(cursor.event == measure.events.length)
-      (insertMeasures(cursor.measure + 1, numMeasures), cursor)
-    else{
+    val cursorEventId = getStaffEventIdFromMeasureEventId(cursor.measureEventId)
 
-      //split the measure
-      var headEvents = measure.events.slice(0, cursor.event)
-      var tailEvents = measure.events.slice(cursor.event, measure.events.length)
+    val timeSig = getTimeSig(cursorEventId)
+    var insertLengthPips = timeSig.measureLengthPips * numMeasures
 
-      //generate some empty measures
-      val emptyMeasures = cloneEmptyMeasures(measure, numMeasures)
+    //0 - find out how far I am into the measure
+    val measure = measures(cursor.measureId)
+    var i = 0
+    var measureBreakPips = 0
+    while(i < cursor.measureEventId.eventId){
+      val eventSet = measure.events(i)
+      measureBreakPips += eventSet.lengthPips
+      i += 1
+    }
 
-      //if we cut a note from its spans move them into the head
-      if(tailEvents.length > 0){
-        //so look a the first set in the tail, find the spans
-        var thisTailSet = tailEvents(0)
-        var newThisTailSet = ArrayBuffer[DisplayEvent]()
-        var newLastHeadSet = ArrayBuffer[DisplayEvent]()
-        var copySet = ArrayBuffer[Int]()
-        var j = 0
-        while(j < thisTailSet.length){
-          val e = thisTailSet(j)
-          e match{
-            case span: DisplaySpan =>
-              copySet += span.barLocation
-              newLastHeadSet += e
-            case _ =>
-              newThisTailSet += e
+    //1 - split events into the set before, the set of spans in the middle (with partial rests stripped out),
+    // the set of notes and full rests after (with spans stripped out)
+    val before = ArrayBuffer[MusicEventSet]()
+    val pivot = ArrayBuffer[MusicEventSet]()
+    val after = ArrayBuffer[MusicEventSet]()
+    i = 0
+    while(i < cursorEventId){
+      before += events(i)
+      i += 1
+    }
+
+    val barLinesWithSpans = mutable.Set[Int]()
+    var j = 0
+    val eventSet = events(i)
+    while(j < eventSet.length){
+      val event = eventSet(j)
+      event match{
+        case span: MusicNoteSpan => barLinesWithSpans += span.barLocation
+        case _ =>
+      }
+      j += 1
+    }
+
+    while(i < events.length){
+      val eventSet = events(i)
+      var j = 0
+      val pivotEventSet = ArrayBuffer[MusicEvent]()
+      val afterEventSet = ArrayBuffer[MusicEvent]()
+      val newBarLinesWithSpans = mutable.Set[Int]()
+      while(j < eventSet.length){
+        val event = eventSet(j)
+        event match{
+          case span: MusicNoteSpan => if(barLinesWithSpans.contains(span.barLocation)){
+            newBarLinesWithSpans += span.barLocation
+            pivotEventSet += span
           }
-          j += 1
+          else
+            afterEventSet += span
+          case _ => afterEventSet += event
         }
-
-        //cut them over
-        if(copySet.nonEmpty){
-          headEvents = headEvents :+ new DisplayEventSet(newLastHeadSet.toArray, thisTailSet.lengthPips)
-          tailEvents = ArrayUtils.replaceElem(tailEvents, 0, new DisplayEventSet(newThisTailSet.toArray, thisTailSet.lengthPips))
-        }
-
-        //now keep looking through the tail, moving the spans
-        var i = 1
-        while(copySet.nonEmpty && i < tailEvents.length){
-
-          val oldCopySet = copySet
-          copySet = ArrayBuffer[Int]()
-
-          thisTailSet = tailEvents(i)
-          newThisTailSet = ArrayBuffer[DisplayEvent]()
-          newLastHeadSet = ArrayBuffer[DisplayEvent]()
-          j = 0
-          while(j < oldCopySet.length){
-            val eventIdxs = thisTailSet.findEventIndexes(oldCopySet(j))
-            var k = 0
-            while(k < eventIdxs.length){
-              val e = thisTailSet(k)
-              e match{
-                case _: DisplaySpan =>
-                  copySet += j
-                  newLastHeadSet += e
-                case _ =>
-                  newThisTailSet += e
-              }
-              k += 1
-            }
-            j +=  1
-          }
-
-          if(newLastHeadSet.nonEmpty)
-            headEvents = headEvents :+ new DisplayEventSet(newLastHeadSet.toArray, thisTailSet.lengthPips)
-          tailEvents = ArrayUtils.replaceElem(tailEvents, i, new DisplayEventSet(newThisTailSet.toArray, thisTailSet.lengthPips))
-
-          i += 1
-        }
+        j += 1
       }
 
-      //these now replace the original
-      headEvents = DisplayGrandStaffMeasure.fixUp(headEvents)
-      tailEvents = DisplayGrandStaffMeasure.fixUp(tailEvents)
-      val replaceMeasures = measure.cloneNewEvents(headEvents) +: emptyMeasures :+ measure.cloneNewEvents(tailEvents)
+      if(pivotEventSet.nonEmpty)
+        pivot += new MusicEventSet(pivotEventSet.toArray, eventSet.lengthPips)
+      if(afterEventSet.nonEmpty)
+        after += new MusicEventSet(afterEventSet.toArray, eventSet.lengthPips)
 
+      barLinesWithSpans.clear()
+      barLinesWithSpans ++= newBarLinesWithSpans
 
-      val newMeasures = ArrayUtils.replaceElems(measures, cursor.measure, 1, replaceMeasures)
-      val newStaff = new DisplayGrandStaff(newMeasures)
-      (newStaff, cursor)
-    } */
+      i += 1
+    }
+
+    //2 - insert rests to the length of lengthPips, less the size of the pivot, and breaking at measure end
+    val pivotLengthPips = pivot.foldLeft(0)((z,e)=>z+e.lengthPips)
+    insertLengthPips -= pivotLengthPips
+    val out = ArrayBuffer[MusicEventSet]()
+    out ++= before
+    out ++= pivot
+
+    val pad = ArrayBuffer[MusicEventSet]()
+    pad += new MusicEventSet(Array(new FullRest(insertLengthPips, GrandStaff.UpperRestBarLine),
+      new FullRest(insertLengthPips, GrandStaff.LowerRestBarLine)), insertLengthPips)
+
+    out ++= pad
+    out ++= after
+
+    val fixedUp = GrandStaff.fixUp(out.toArray)
+
+    (new GrandStaff(fixedUp, GrandStaff.generateMeasures(fixedUp)), cursor)
   }
 
   override def deleteMeasuresAtCursor(cursor: Cursor, numMeasures: Int): (Staff, Cursor) = {
@@ -591,13 +704,6 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
     new DisplayGrandStaff(newMeasures)
   }
 
-   override def insertMeasures(measureId: Int, numMeasures: Int): DisplayStaff = {
-    val measure = measures(measureId)
-    val insertedMeasures: Array[DisplayGrandStaffMeasure] = cloneEmptyMeasures(measure, numMeasures)
-    val newMeasures = ArrayUtils.insertElemsAndShift(measures, measureId, insertedMeasures)
-    new DisplayGrandStaff(newMeasures)
-  }
-
   private [this] def cloneEmptyMeasures(measure: DisplayGrandStaffMeasure, numMeasures: Int): Array[DisplayGrandStaffMeasure] = {
     val clonedMeasures = new Array[DisplayGrandStaffMeasure](numMeasures)
     var i = 0
@@ -608,9 +714,11 @@ class GrandStaff(val events: Array[MusicEventSet], val measures: Array[GrandStaf
     clonedMeasures
   }
    */
+
+
   override def numMeasures: Int = measures.length
 
-  override def cursorMoveStaff(cursor: Cursor, direction: Int): Option[Cursor] = direction match {
+  override def cursorMoveVerticalWithinStaff(cursor: Cursor, direction: Int): Option[Cursor] = direction match {
     case Cursor.UP =>
       if(cursor.barLine < GrandStaff.MaxBarLine) Some(cursor.upABarLine) else None
     case Cursor.DOWN =>

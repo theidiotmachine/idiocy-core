@@ -4,13 +4,15 @@ import idiocy.music.key.Key
 import idiocy.ui.data.TimeSig
 import idiocy.ui.utils.ArrayUtils
 
+import scala.collection.mutable.ArrayBuffer
+
 object MusicEventSet{
-  def addInLongNote(events: Array[MusicEventSet],
-                    from: Int,
-                    displayNote: MusicNote): Array[MusicEventSet] = {
+  def insertNote(events: Array[MusicEventSet],
+                 from: Int,
+                 note: MusicNote): Array[MusicEventSet] = {
     val unchangedBeginStub = ArrayUtils.subRange(events, 0, from)
     var out = unchangedBeginStub
-    var remainingLength = displayNote.lengthPips
+    var remainingLength = note.lengthPips
     var i = from
 
     var theseEvents = events(i)
@@ -21,13 +23,13 @@ object MusicEventSet{
       // after
       val (new1, new2) = theseEvents.split(remainingLength)
       out = out :+
-        (new1 :+ displayNote) :+
-        (new2 :+ PartialRest(theseEventsLength - remainingLength, displayNote.barLocation))
+        (new1 :+ note) :+
+        (new2 :+ PartialRest(theseEventsLength - remainingLength, note.barLocation))
       remainingLength = 0
       i += 1
     } else {
       //it's longer or the same, so add in the note
-      theseEvents = theseEvents :+ displayNote
+      theseEvents = theseEvents :+ note
       out = out :+ theseEvents
       remainingLength -= theseEventsLength
       i += 1
@@ -38,12 +40,12 @@ object MusicEventSet{
         val theseEventsLength = theseEvents.lengthPips
         if (theseEventsLength <= remainingLength) {
           remainingLength -= theseEventsLength
-          out = out :+ (theseEvents :+ MusicNoteSpan(theseEventsLength, displayNote.barLocation, displayNote.accidental))
+          out = out :+ (theseEvents :+ MusicNoteSpan(theseEventsLength, note.barLocation, note.accidental))
         } else {
           val (new1, new2) = theseEvents.split(remainingLength)
           remainingLength = 0
-          out = out :+ (new1 :+ MusicNoteSpan(remainingLength, displayNote.barLocation, displayNote.accidental)) :+
-            (new2 :+ PartialRest(theseEventsLength - remainingLength, displayNote.barLocation))
+          out = out :+ (new1 :+ MusicNoteSpan(remainingLength, note.barLocation, note.accidental)) :+
+            (new2 :+ PartialRest(theseEventsLength - remainingLength, note.barLocation))
         }
 
         i += 1
@@ -53,12 +55,12 @@ object MusicEventSet{
     if (i < events.length)
       out = out ++ ArrayUtils.subRange(events, i, events.length)
     else if(remainingLength > 0){
-      out = out :+ new MusicEventSet(Array(MusicNoteSpan(remainingLength, displayNote.barLocation, displayNote.accidental)), remainingLength)
+      out = out :+ new MusicEventSet(Array(MusicNoteSpan(remainingLength, note.barLocation, note.accidental)), remainingLength)
     }
     out
   }
 
-  def addInLongRest(events: Array[MusicEventSet], from: Int, lengthPips: Long, barLocation: Int): Array[MusicEventSet] = {
+  def insertPartialRest(events: Array[MusicEventSet], from: Int, lengthPips: Int, barLocation: Int): Array[MusicEventSet] = {
     val unchangedBeginStub = ArrayUtils.subRange(events, 0, from)
     var out = unchangedBeginStub
     var remainingLength = lengthPips
@@ -104,8 +106,8 @@ object MusicEventSet{
     var i = 0
     while(i < out.length - 1){
       var smooshCandidate = true
-      val theseEvents = events(i)
-      val nextEvents = events(i+1)
+      val theseEvents = out(i)
+      val nextEvents = out(i+1)
       val theseEventsArray = theseEvents.events
       var nextEventsArray = nextEvents.events
       var j = 0
@@ -163,8 +165,55 @@ object MusicEventSet{
     }
     out
   }
+
+  def splitAtMeasureBoundaries(events: Array[MusicEventSet]): Array[MusicEventSet] = {
+    if(events.isEmpty)
+      Array[MusicEventSet]()
+    else{
+      val out = ArrayBuffer[MusicEventSet]()
+      var timeSig = TimeSig.timeSig44
+      var timeLeftInMeasure = timeSig.measureLengthPips
+      var eventSetIdx = 0
+      while(eventSetIdx < events.length){
+        val theseEvents = events(eventSetIdx)
+        var eventIdx = 0
+
+        var oNewTimeSig: Option[TimeSig] = None
+        while(eventIdx < theseEvents.length){
+          theseEvents(eventIdx) match {
+            case timeSigEvent: TimeSigEvent =>
+              oNewTimeSig = Some(timeSigEvent.timeSig)
+            case _ =>
+          }
+          eventIdx += 1
+        }
+
+        oNewTimeSig.foreach(newTimeSig=>{
+          timeLeftInMeasure = newTimeSig.measureLengthPips
+          timeSig = newTimeSig
+        })
+
+        var toSplit = theseEvents
+        while(toSplit.lengthPips > timeLeftInMeasure){
+          val (l, r) = toSplit.split(timeLeftInMeasure)
+          out += l
+          timeLeftInMeasure = timeSig.measureLengthPips
+          toSplit = r
+        }
+        out += toSplit
+        timeLeftInMeasure -= toSplit.lengthPips
+        if(timeLeftInMeasure == 0){
+          timeLeftInMeasure = timeSig.measureLengthPips
+        }
+
+        eventSetIdx += 1
+      }
+      out.toArray
+    }
+  }
 }
-class MusicEventSet(val events: Array[MusicEvent], val lengthPips: Long) {
+
+final class MusicEventSet(val events: Array[MusicEvent], val lengthPips: Int) {
   def getTimeSig: Option[TimeSig] = {
     events.foldLeft[Option[TimeSig]](None)(
       (b, e) => if(b.isDefined) b else e match {
@@ -173,7 +222,7 @@ class MusicEventSet(val events: Array[MusicEvent], val lengthPips: Long) {
       })
   }
 
-  def extendEventSet(l: Long): MusicEventSet = {
+  def extendEventSet(l: Int): MusicEventSet = {
     new MusicEventSet(events.map {
       case note: MusicNote => new MusicNote(l, note.barLocation, note.accidental)
       case rest: PartialRest => PartialRest(l, rest.barLocation)
@@ -204,30 +253,6 @@ class MusicEventSet(val events: Array[MusicEvent], val lengthPips: Long) {
     new MusicEventSet(events :+ musicEvent, lengthPips)
   }
 
-  def findEventIndexes(atBarLine: Int): Array[Int] = {
-    var j = 0
-    var out = Array[Int]()
-    while(j < events.length){
-      events(j) match{
-        case note: MusicNote =>
-          if(note.barLocation == atBarLine)
-            out = out :+ j
-        case fullRest: FullRest =>
-          if((fullRest.barLocation > 0 && atBarLine >= 0) || (fullRest.barLocation < 0 && atBarLine <= 0))
-            out = out :+ j
-        case rest: PartialRest =>
-          if(rest.barLocation == atBarLine)
-            out = out :+ j
-        case span: MusicNoteSpan =>
-          if(span.barLocation == atBarLine)
-            out = out :+ j
-        case _ =>
-      }
-      j += 1
-    }
-    out
-  }
-
   /**
     * Given where to split in pips, split this event set into two event sets, the first with the new
     * size and the second with the left-over size. Notes are split into spans, rests into sub-rests
@@ -235,7 +260,7 @@ class MusicEventSet(val events: Array[MusicEvent], val lengthPips: Long) {
     * @param newLengthPips the new length in pips
     * @return
     */
-  def split(newLengthPips: Long): (MusicEventSet, MusicEventSet) = {
+  def split(newLengthPips: Int): (MusicEventSet, MusicEventSet) = {
     val stubLengthPips = lengthPips - newLengthPips
     var j = 0
     var outFirst = new MusicEventSet(Array(), newLengthPips)

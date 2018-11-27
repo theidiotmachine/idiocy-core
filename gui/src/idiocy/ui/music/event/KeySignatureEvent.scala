@@ -6,5 +6,5 @@ object KeySignatureEvent{
   implicit def rw: RW[KeySignatureEvent] = macroRW
 }
 final case class KeySignatureEvent(key: Key) extends MusicEvent {
-  override val lengthPips: Long = 0
+  override val lengthPips: Int = 0
 }

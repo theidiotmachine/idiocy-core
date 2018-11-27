@@ -18,7 +18,7 @@ object IntNaturalPitchClass{
 /**
   * This is the pitch class of the natural notes. Actually, IntPitchClass should be called Chromatic but I mean we're
   * all friends here right
-  * @param data
+  * @param data 0 - 6
   */
 final class IntNaturalPitchClass(val data: Int) extends AnyVal {
   def toIntPitchClass: IntPitchClass = {
